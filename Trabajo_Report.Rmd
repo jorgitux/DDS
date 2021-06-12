@@ -1,0 +1,241 @@
+---
+title: "TRABAJO FINAL"
+author: "Grupo 5"
+date: "5/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ÍNDICE
+
+1. Business Case
+2. Identify source feed
+3. Review documentation and schema
+4. Identify variables and correlations
+5. Define elegant data
+6. ETL (Extract, Transform, Load)
+7. Visual exploration
+8. Validation tests
+9. Document
+
+
+
+## 1. BUSINESS CASE
+
+- **User**: CISO, TISO
+
+- **Use Case**: Gestionar los riesgos por vulnerabilidades de aplicaciones web y mobile por sprint.
+
+- **Questions**:
+
+  Q1. ¿Qué tan críticas son las vulnerabilidades?
+  
+  Q2. ¿Qué vulnerabilidades debería priorizar su mitigación?
+  
+  Q3. ¿Estoy avanzando en la gestión de estas vulnerabilidades?
+  
+  Q4. ¿Existen vulnerabilidades comunes a las aplicaciones?
+  
+- **Metrics**:
+
+  % vulnerabilidades por criticidad → Q1
+  % vulnerabilidades por tecnología (lenguaje) → Q1
+
+  % vulnerabilidades críticas de aplicaciones críticas → Q2
+  % vulnerabilidades repetidas por aplicación → Q2, Q3
+
+  % vulnerabilidades no tratadas hasta la fecha  → Q3
+  % vulnerabilidades críticas no tratadas hasta la fecha  → Q3
+
+  % vulnerabilidades presentes en más de 1 aplicación → Q4
+  
+- **Actions**:
+
+  A1. Generar tickets manuales para priorizar la remediación.
+  
+  A2. Informar a áreas responsables de los activos del riesgo asociado.
+  
+  A3. Determinar la necesidad de capacitación sobre Desarrollo Seguro de Software a un equipo de tecnología específico.
+  
+  A4. Determinar la necesidad de capacitación sobre la prevención de una vulnerabilidad específica del OWASP.
+
+
+
+## 2. IDENTIFY SOURCE FEED
+
+
+
+## 3. REVIEW DOCUMENTATION AND SCHEMA
+
+
+
+## 4. Identify variables and correlations
+
+
+
+## 5. Define elegant data
+
+
+
+## 6. ETL (Extract, Transform, Load)
+
+Se cargaron en R los datos de los reportes actuales e históricos de Fortify para las aplicaciones de la organización:
+
+```{r message=FALSE,echo=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+```
+
+```{r message=FALSE}
+# App1
+app1_report <- read.csv("data-csv/App1 - 2021.csv",header = TRUE, sep = ";")
+# App2
+app2_report <- read.csv("data-csv/App2 - 2021.csv",header = TRUE, sep = ";")
+```
+
+Al realizar la importación de los datos, observamos que se obtiene un dataframe, tal como se muestra:
+```{r}
+class(app1_report)
+```
+
+Adicionalmente, al hacer la revisión de las variables, se observa que toda la información ha sido importada en su mayoría como character
+```{r}
+summary(app1_report)
+```
+
+Por lo que para poder hacer las operaciones, es necesario poder corregir los tipos de datos antes de poder operar con ellos, sin embargo, dado que todos los dataframes formados tienen la misma estructura y tipos de datos, primero los unimos en un mismo dataframe y luego realizamos las transformaciones respectivas:
+```{r}
+# Union de reporte
+app_report <- rbind(app1_report, app2_report)
+
+# Convierte datos necesarios a datos categóricos
+app_report$Application <- as.factor(app_report$Application)
+app_report$Language <- as.factor(app_report$Language)
+app_report$Category <- as.factor(app_report$Category)
+app_report$Criticality <- as.factor(app_report$Criticality)
+app_report$Scan.Status <- as.factor(app_report$Scan.Status)
+app_report$Impact <- as.factor(app_report$Impact)
+app_report$Severity <- as.factor(app_report$Severity)
+app_report$Kingdom <- as.factor(app_report$Kingdom)
+
+# Convierte datos necesarios a datos de tipo Date
+app_report$Found.Date <- as.Date(app_report$Found.Date)
+app_report$Removed.Date <- as.Date(app_report$Removed.Date)
+
+# Convierte datos necesarios a datos de tipo Lógico
+app_report$Is.Reviewed <- as.logical(app_report$Is.Reviewed)
+app_report$Has.Correlated.Issues <- as.logical(app_report$Has.Correlated.Issues)
+app_report$Has.Comments <- as.logical(app_report$Has.Comments)
+app_report$Is.Removed <- as.logical(app_report$Is.Removed)
+app_report$Is.Suppressed <- as.logical(app_report$Is.Suppressed)
+app_report$Is.Hidden <- as.logical(app_report$Is.Hidden)
+```
+
+Dado que en las 2 primeras métricas [Ver "Metrics"](#business-case) se va a necesitar como denominador común el # de vulns, hacemos el cálculo y lo almacenamos en una variable:
+```{r}
+num_vulns_actually = nrow(app_report)
+```
+```{r echo=FALSE}
+num_vulns_actually
+```
+
+Para el cálculo del 1º indicador, faltaría agrupar las vulnerabilidades en base a su criticidad, lo haremos de la siguiente manera:
+```{r}
+df <- app_report %>% group_by(Criticality) %>% summarise(num = n())
+```
+
+Por lo que tendríamos el siguiente data frame:
+```{r echo=FALSE}
+df
+```
+Dado que ya tenemos el número de vulns por criticidad, aprovecharemos esa estructura, para adicionar una columna que represente su % con respecto al total, obteniendo lo siguiente:
+```{r}
+df[,"Percent"] <- df[,"num"] / num_vulns_actually*100
+```
+```{r echo=FALSE}
+df
+```
+
+En base a la información obtenida, la representaremos mediante un gráfico de barras para poder realizar una comparación visual:
+```{r echo=FALSE}
+df %>%
+  mutate(name = fct_reorder(Criticality, Percent)) %>%
+  ggplot( aes(x=Criticality, y=Percent)) +
+  geom_bar(stat="identity", fill="red", alpha=.6, width=.4) +
+  coord_flip() +
+  xlab("Criticality") +
+  theme_bw()
+```
+
+Para obtener el 2º indicador, se relizará la agrupación por tecnología:
+```{r}
+df_lang <- app_report %>% group_by(Language) %>% summarise(num = n())
+```
+
+Por lo que tendríamos el siguiente data frame:
+```{r echo=FALSE}
+df_lang
+```
+Dado que ya tenemos el número de vulns por tecnología, aprovecharemos esa estructura, para adicionar una columna que represente su % con respecto al total, obteniendo lo siguiente:
+```{r}
+df_lang[,"Percent"] <- df_lang[,"num"] / num_vulns_actually*100
+```
+```{r echo=FALSE}
+df_lang
+```
+En base a la información obtenida, la representaremos mediante un gráfico de barras para poder realizar una comparación visual:
+```{r echo=FALSE}
+df_lang %>%
+  mutate(name = fct_reorder(Language, Percent)) %>%
+  ggplot( aes(x=Language, y=Percent)) +
+  geom_bar(stat="identity", fill="black", alpha=.6, width=.4) +
+  coord_flip() +
+  xlab("Language") +
+  theme_bw()
+```
+
+
+
+## 7. Visual exploration
+
+
+
+## 8. Validation tests
+
+
+
+## 9. Document
+
+
+
+
+
+
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
