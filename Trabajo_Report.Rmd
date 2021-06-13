@@ -1,6 +1,6 @@
 ---
 title: "TRABAJO FINAL"
-author: "Grupo 5"
+author: "GRUPO 5"
 date: "5/6/2021"
 output: html_document
 ---
@@ -18,8 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 5. Define elegant data
 6. ETL (Extract, Transform, Load)
 7. Visual exploration
-8. Validation tests
-9. Document
+8. Document
 
 
 
@@ -66,21 +65,48 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## 2. IDENTIFY SOURCE FEED
 
+Para el presente trabajo se han buscado diferentes dataset, como:
 
+- DataSet MTRE
+- DataSet CVE
+- DataSet CWE
+- DataSet Fortify
 
 ## 3. REVIEW DOCUMENTATION AND SCHEMA
 
+Si bien es cierto la información de los datasets como MTRE, CVE, CWE y Fortify podrían ser un excelente complemento para analizar las vulnerabilidades, para su gestión y tratamiento en base a las criticidades del mismo no aportan valor en específico, dado que la priorización va a depender de la severidad de las mismas.
+
+**¿Qué es Fortify?**
+Fortify es una solución de seguridad de aplicaciones. Realiza  pruebas de seguridad de las aplicaciones, la gestión de la seguridad del software y la protección automática de las aplicaciones para ayudarle a asegurar las aplicaciones de manera automática.
+
+**Caso de uso de Fortify:**
+Se utiliza para escanear las vulnerabilidades del código fuente de las aplicaciones durante el proceso de integración continua y despliegue continuo.
+
+Permite obtener la Probabilidad e impacto de las vulnerabilidades:
+![Probably vs Impact](report-images/Probably_impact.png)
+
+Exporta diferentes reportes según las vulnerabilidades de los estándares de la industria:
+![Report](report-images/report.png)
+ 
+Para nuestro proyecto hemos incluido dataset de Fortify de las siguientes tecnologías:
+
+- Java
+
+- Kotlin
+
+- PHP
+
+- ObjectiveC
 
 
-## 4. Identify variables and correlations
+Las cuales correspondes aplicaciones Web y Mobile así como basados en la detección de vulnerabilidades según la guía Owasp Top 10 así como la CWE.
 
 
+## 4. IDENTIFY VARIABLES AND CORRELATIONS
 
-## 5. Define elegant data
+Para el caso de los 
 
-
-
-## 6. ETL (Extract, Transform, Load)
+## 5. DEFINE ELEGANT DATA
 
 Se cargaron en R los datos de los reportes actuales e históricos de Fortify para las aplicaciones de la organización:
 
@@ -103,6 +129,8 @@ Al realizar la importación de los datos, observamos que se obtiene un dataframe
 ```{r}
 class(app1_report)
 ```
+
+## 6. ETL (Extract, Transform, Load)
 
 Adicionalmente, al hacer la revisión de las variables, se observa que toda la información ha sido importada en su mayoría como character
 ```{r}
@@ -137,6 +165,9 @@ app_report$Is.Suppressed <- as.logical(app_report$Is.Suppressed)
 app_report$Is.Hidden <- as.logical(app_report$Is.Hidden)
 ```
 
+## 7. VISUAL EXPLORATION
+
+
 Dado que en las 2 primeras métricas [Ver "Metrics"](#business-case) se va a necesitar como denominador común el # de vulns, hacemos el cálculo y lo almacenamos en una variable:
 ```{r}
 num_vulns_actually = nrow(app_report)
@@ -145,16 +176,16 @@ num_vulns_actually = nrow(app_report)
 num_vulns_actually
 ```
 
-Para el cálculo del 1º indicador, faltaría agrupar las vulnerabilidades en base a su criticidad, lo haremos de la siguiente manera:
+Para el cálculo del 1º indicador, faltaría agrupar las vulnerabilidades en base a su severidad, lo haremos de la siguiente manera:
 ```{r}
-df <- app_report %>% group_by(Criticality) %>% summarise(num = n())
+df <- app_report %>% group_by(Severity) %>% summarise(num = n())
 ```
 
 Por lo que tendríamos el siguiente data frame:
 ```{r echo=FALSE}
 df
 ```
-Dado que ya tenemos el número de vulns por criticidad, aprovecharemos esa estructura, para adicionar una columna que represente su % con respecto al total, obteniendo lo siguiente:
+Dado que ya tenemos el número de vulns por severidad, aprovecharemos esa estructura, para adicionar una columna que represente su % con respecto al total, obteniendo lo siguiente:
 ```{r}
 df[,"Percent"] <- df[,"num"] / num_vulns_actually*100
 ```
@@ -165,11 +196,11 @@ df
 En base a la información obtenida, la representaremos mediante un gráfico de barras para poder realizar una comparación visual:
 ```{r echo=FALSE}
 df %>%
-  mutate(name = fct_reorder(Criticality, Percent)) %>%
-  ggplot( aes(x=Criticality, y=Percent)) +
+  mutate(name = fct_reorder(Severity, Percent)) %>%
+  ggplot( aes(x=Severity, y=Percent)) +
   geom_bar(stat="identity", fill="red", alpha=.6, width=.4) +
   coord_flip() +
-  xlab("Criticality") +
+  xlab("Severity") +
   theme_bw()
 ```
 
@@ -200,42 +231,54 @@ df_lang %>%
   theme_bw()
 ```
 
-
-
-## 7. Visual exploration
-
-
-
-## 8. Validation tests
-
-
-
-## 9. Document
-
-
-
-
-
-
-
-
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+El último gráfico que muestra que los desarrollos en JAVA tienen la mayor cantidad de vulnerabilidades, sin embargo al hacer una revisión de las severidades observamos que tiene un gran volumen de vulnerabilidades que no son Críticas.
+```{r echo=FALSE,message=FALSE}
+y<- app_report %>% group_by(Language,Severity) %>% summarise(num = n())
+y
 ```
 
-## Including Plots
+Ahora bien, dado que requerimos hacer una comparación entre las aplicaciones basado en la criticidad de las vulnerabilidades, procedemos a realizar las agrupaciones correspondientes de la siguiente forma:
+```{r message=FALSE}
+df_app_severity <- app_report %>% group_by(Application,Severity) %>% summarise(num = n())
+```
+```{r echo=FALSE}
+df_app_severity
+```
+Por lo que podemos obtener la siguiente gráfica:
+```{r echo=FALSE}
 
-You can also embed plots, for example:
+df_app_severity %>% ggplot( aes(fill=Severity, y=num, x=Application) ) +
+                      geom_bar(position = "dodge", stat="identity") +
+                      ylab("Nº Vulns")
+```
+Ahora para enforcarnos en el % de las vulnerabilidades que tiene cada aplicación como Severidad "Crítica (Severity=5), procedemos a hacer los cálculos respectivos:
+```{r}
+df_app <- app_report %>% group_by(Application) %>% summarise(num = n())
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+x <- df_app_severity %>% filter(Severity==5)
+x[,"Percent"] <- x[,"num"]/df_app[,"num"]*100
+```
+Por lo que obtenemos la siguiente información:
+```{r echo=FALSE}
+x
+```
+Con dicha información obtenemos la siguiente representación gráfica:
+```{r echo=FALSE}
+x %>%
+  mutate(name = fct_reorder(Application, Percent)) %>%
+  ggplot( aes(x=Application, y=Percent)) +
+  geom_bar(stat="identity", fill="blue", alpha=.6, width=.4) +
+  coord_flip() +
+  xlab("Application") +
+  theme_bw()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+De las gráficas mostradas se puede observar lo siguiente con respecto al código de sus aplicaciones en el presente año:
+
+1. Se cuenta con muy pocas vulnerabilidades de severidad Crítica (Severity=5) o Alta (Severity=4)
+2. Se observa que la mayor cantidad de vulnerabilidades se encuentra a nivel de JAVA, sin embargo estas en su mayoría son Bajas.
+3. La organización debería poner especial atención en la aplicación QWERTY, dado que si bien tiene vulnerabilidades de severidad baja, la unión de ellas puede implicar un riesgo mayor, esto debe qudar a consideración del analista de seguridad.
+
+## 8. DOCUMENT
+
+Repositorio: Github [https://github.com/jorgitux/DDS]
